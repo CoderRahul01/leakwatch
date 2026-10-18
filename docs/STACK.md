@@ -48,3 +48,12 @@ backend). The REA session is shared in the post.
 OpenCode Zen's free models (incl. DeepSeek V4 Flash Free) are on an OpenAI-compatible endpoint, but
 the list changes, limits are per IP, and free traffic may be used for training — wrong for client ad
 data. We use OpenCode as a coding agent only. HF Inference Endpoints bill per hour; Workers AI per request.
+
+## First REA observation (Oct 18, 2026)
+`rea capture-browser-scenario` (REA 6.5.0, headless, 390×844 phone viewport, 7 s, network events) on a
+public Shopify store home page: 334 requests. The Meta pixel script (`connect.facebook.net/en_US/fbevents.js`)
+and its config for one pixel ID loaded, plus Google Tag Manager and two Google Ads tags, but **no
+`facebook.com/tr` PageView hit inside the window**. 35 requests aborted. This is the case the probe must
+classify carefully before calling it a leak: consent gating, a delayed fire, or a real break. Rules
+from this: wait for network idle + up to 15 s, record consent-banner presence, and report "pixel loaded,
+no event seen" as its own state ("couldn't confirm"), not as "broken".
