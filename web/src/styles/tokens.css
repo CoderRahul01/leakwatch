@@ -1,0 +1,76 @@
+/* Leakwatch Night: a midnight canvas, one periwinkle signal, and colour that always means money.
+   Derived from the Copilot Money reference, shifted: a cooler canvas, a violet-leaning signal blue,
+   and meaning colours (leak, saved) in place of a single accent. */
+
+:root {
+  /* Surfaces: depth by tone, never by drop shadow */
+  --canvas: #02060d;
+  --s1: #060f1c;
+  --s2: #0a1930;
+  --s3: #0e2650;
+  --hair: #132438;
+  --hair-soft: rgba(19, 36, 56, 0.55);
+
+  /* Ink */
+  --ink: #f4f6fb;
+  --fog: #c2c8d2;
+  --mist: #8b93a1;
+  --dim: #5d6675;
+
+  /* The one action colour */
+  --signal: #4b6bff;
+  --signal-hi: #6d88ff;
+  --signal-deep: #2a3fb8;
+  --signal-wash: rgba(75, 107, 255, 0.14);
+
+  /* Meaning */
+  --leak: #ff5a3c;
+  --leak-wash: rgba(255, 90, 60, 0.13);
+  --warn: #ffb020;
+  --warn-wash: rgba(255, 176, 32, 0.13);
+  --saved: #1ed67a;
+  --saved-wash: rgba(30, 214, 122, 0.13);
+  --idle: #5f7390;
+
+  /* Candy tags (landing only, always on midnight) */
+  --tag-coral: #ff5a3c;
+  --tag-lime: #1ed67a;
+  --tag-tangerine: #ff9033;
+  --tag-pink: #ff3fa4;
+  --tag-violet: #8d3bf0;
+  --tag-sun: #ffd12e;
+  --tag-sky: #18b4ff;
+  --tag-ember: #ec6a80;
+  --tag-olive: #94ae43;
+  --tag-slate: #5f7390;
+
+  /* Type */
+  --display: 'Space Grotesk Variable', 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --body: 'Inter Variable', 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+  --w-thin: 250;
+  --w-body: 300;
+  --w-strong: 500;
+
+  /* Radii */
+  --r-img: 8px;
+  --r-btn: 16px;
+  --r-tag: 20px;
+  --r-card: 24px;
+  --r-xl: 40px;
+  --r-pill: 9999px;
+
+  /* Inset lighting */
+  --lift: inset 4px 4px 16px -4px rgba(255, 255, 255, 0.12), inset -4px -4px 16px -4px rgba(0, 0, 0, 0.35),
+    inset 4px 4px 8px 0 rgba(255, 255, 255, 0.04), inset 1px 1px 1px -0.5px rgba(255, 255, 255, 0.32);
+  --press: inset -4px -4px 16px -4px rgba(0, 0, 0, 0.4), inset 2px 2px 6px rgba(0, 0, 0, 0.35);
+  --glow: inset 0 0 12px 0 rgba(75, 107, 255, 0.12), inset 0 -4px 8px 0 rgba(0, 0, 0, 0.32);
+
+  /* Motion */
+  --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --page: 1200px;
+  --gutter: clamp(16px, 4vw, 40px);
+  color-scheme: dark;
+}
