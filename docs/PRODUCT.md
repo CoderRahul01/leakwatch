@@ -1,158 +1,149 @@
-# Leakwatch: Product Requirements
+# Leakwatch: Product Requirements (v2, final)
 
-> **Your ad account, watched every morning.** Drop in your ads report. Leakwatch finds the money
-> that's leaking (the ad that spends but never sells, the audience that's tired of you, the link
-> that's broken) and tells you in plain words what to pause, what to fix, and what it saves you.
+> **Every rupee from ad to sale, watched.** Leakwatch connects to your ad account, follows each
+> ad's path from spend → click → page → tracking → sale, and tells you where the money is leaking,
+> what it's costing, and fixes it with one tap. Then it checks the next day that the fix worked.
 
-**Status:** v0.1, Oct 18, 2026 · **Challenge:** Hacktoberfest Week 2 "Side Hustle" (due Oct 18, 11:59 PM PDT = Oct 19, 12:29 PM IST)
-**Platform:** web app, desktop first (people read ad reports on a laptop), works on a phone for the morning check.
+**Status:** v2, Oct 18, 2026 (v1 "drop a CSV" replaced: too static) · **Challenge:** Hacktoberfest Week 2 "Side Hustle", due **Oct 19, 12:29 PM IST**
+**Research:** [TEARDOWN.md](TEARDOWN.md) · **Platform:** web app, desktop first, phone for the morning check.
 
 ---
 
 ## 1. Problem
 
-Millions of small businesses run their own Meta and Google ads: a bakery boosting Diwali boxes, a
-D2C skincare brand, a yoga teacher filling a workshop, a freelancer running ads for three clients.
-They spend **$300 to $5,000 a month**, with nobody watching the account full time.
+Small businesses spending **$300–$5,000 a month** on Meta ads lose money in two ways:
 
-- Money leaks quietly. An ad set spends ₹4,000 over a week with zero sales and nobody notices
-  until the card bill arrives.
-- Ads Manager shows 40 columns and explains none of them. "Frequency 4.2, CPM up 38%" means
-  nothing to a bakery owner.
-- The tools that do watch accounts (Madgicx, Revealbot/Bïrch, AdEspresso) start at **$49–$99 a
-  month** and are priced as a share of ad spend. Reviewers say outright that at $500/month of ad
-  spend the subscription eats the margin, and that small businesses should "use a spreadsheet."
-- Agencies and freelancers sign NDAs. Pasting a client's revenue, margins and audiences into a
-  closed chatbot is exactly what they promised not to do.
+1. **Inside the account:** ad sets that spend and never sell, tired audiences, cost spikes.
+   Watchers exist but cost $49–$489 and you write the rules yourself.
+2. **After the click (the expensive, invisible one):** the landing page is slow or broken on
+   phones, a redirect drops the ad's tags, the pixel stops sending Purchase. Meta now optimises on
+   bad data, so it finds worse buyers. The owner sees "ads stopped working" and pauses good ads or
+   raises budget on bad ones. Tracking apps exist (Shopify-only) but never say which ad it's costing.
+
+Nobody watches the whole path for one small advertiser and puts a money figure on each break.
 
 ## 2. Who it's for
 
-| Persona | Spend | What Leakwatch gives back |
-|---|---|---|
-| **Solo shop owner** (bakery, salon, boutique, D2C brand) | $300–1,500/mo | "Pause 'Lookalike 2%': ₹3,850 this week, 0 orders. Saves about ₹16k a month." |
-| **Freelance media buyer** with 2–5 clients | $2k–20k/mo across clients | One morning list across all clients; a clean PDF to send each client |
-| **Coach / creator** selling a course or workshop | $200–800 per launch | "Your ads stop working after 9 PM. Stop spending at night." |
-| **Indie hacker** running a first campaign | $100–500 | "Your landing page returned an error for 2 days while you paid for 1,140 clicks." |
-
-**First user for the build:** a real small advertiser we know (see `content/FIRST_USER.md`).
+| Persona | What Leakwatch gives back |
+|---|---|
+| **Solo D2C / shop owner** ($300–1.5k/mo) | "Purchase stopped reaching Meta on Oct 14. Since then ₹11,200 spent on ads optimising blind. Fix: reconnect the pixel on your checkout." |
+| **Freelance media buyer** (2–5 clients) | One morning list across clients, guards running overnight, a client report that shows money saved |
+| **Coach / course creator** (launch bursts) | "Your sign-up page takes 7.8 s on phones. 41% of paid clicks leave before it loads." |
+| **Indie hacker** (first $200 campaign) | "Your ad links to `/pricing?ref=…` which 404s since your last deploy." |
 
 ## 3. Principles
-1. **Money first, metrics second.** Every finding is a rupee/dollar amount and one action. No
-   charts you have to interpret.
-2. **One minute to value.** No sign-up, no ad-account connection. Drop a file (or try the demo
-   account) and see your leaks in under 10 seconds.
-3. **Your numbers stay yours.** The file is read in your browser. Only a short summary of the leaks
-   goes to an open model we run ourselves. Nothing is stored unless you save a watch.
-4. **The model never does arithmetic.** Code finds and prices the leaks; the model only explains
-   them and answers questions. Every number on screen comes from your file.
-5. **Never a dead end.** If the model is busy, you still get every leak, explained by plain rules.
-6. **Plain language.** No model names in the product. Partners credited in the footer and the post.
+1. **Money first.** Every finding = an amount, a step in the chain, one action.
+2. **Live, not a report.** It keeps watching; findings appear, get fixed, get verified.
+3. **You stay in charge.** Nothing changes in your account without your tap, except guards you
+   switched on yourself, and every change has an undo.
+4. **The model never does arithmetic.** Code finds and prices leaks; the open model explains them
+   and answers questions; every number on screen comes from the data.
+5. **Value before trust.** A live demo account for anyone; connecting Meta is step two.
+6. **Plain words.** No model names or jargon in the product UI.
 
-## 4. The loop
+## 4. The loop (dynamic)
 
 ```
- MONDAY (or every morning on Pro)       READ (60 s)                     ACT
- ┌─────────────────────────┐   ┌────────────────────────────────┐   ┌─────────────────────────┐
- │ Export report from Ads  │   │ "₹9,420 of ₹31,200 leaked       │   │ Tick "Done" on a fix    │
- │ Manager (or it arrives  │──▶│  this week (30%)."              │──▶│ → Saved-money counter   │
- │ by email on Pro)        │   │ Leaks ranked by money, each     │   │   goes up next week     │
- │ → drop it on Leakwatch  │   │ with one action + "why"         │   │ Ask: "why was Tue bad?" │
- └─────────────────────────┘   └────────────────────────────────┘   └─────────────────────────┘
-          ▲                                                                     │
-          └──────── tomorrow's forecast: "these 2 ad sets will likely miss" ◀──────┘
+   ┌──────── WATCH (hourly) ────────┐     ┌────── PINPOINT ──────┐     ┌──── STOP ────┐     ┌── IMPROVE / VERIFY ──┐
+   │ Meta insights per ad, ad set    │     │ Leak card: step in   │     │ Pause, cut    │     │ Move budget to the    │
+   │ Probe each live landing URL     │ ──▶ │ the chain, ₹ at risk │ ──▶ │ budget, or    │ ──▶ │ winners; next day:    │
+   │ in a real phone browser (daily) │     │ per day, evidence,   │     │ fix the link; │     │ "Fixed ✓ — ₹2,300/wk  │
+   │ Forecast tomorrow (TabPFN)      │     │ plain explanation    │     │ undo any time │     │ saved" or "still      │
+   └─────────────────────────────────┘     └──────────────────────┘     └──────────────┘     │ leaking"             │
+                 ▲                                                                           └──────────────────────┘
+                 └────────────── Guards keep watching overnight (opt-in auto-pause) ◀──────────────────┘
 ```
 
-## 5. Leak types (the detectors)
+## 5. Detectors (by step in the chain)
 
-All computed in code from the report rows. Each produces: **money at risk this period**, an
-**estimated monthly saving**, a **confidence** (high / medium) and **one action**.
+| Step | # | Leak | How we know | Fix offered |
+|---|---|---|---|---|
+| Spend | S1 | **Spending, not selling** | ≥ 2× target cost per result, 0 results | Pause (1 tap) |
+| Spend | S2 | **Cost per result too high** | ≥ 1.8× account median, 3+ days | Cut budget 30% / pause |
+| Spend | S3 | **Tired audience** | Frequency ≥ 3.5 and CTR down ≥ 25% vs first days | Swap creative / widen audience |
+| Spend | S4 | **Price spike** | CPM up ≥ 35% vs 7-day median, results flat | Pause 24 h |
+| Page | P1 | **Broken link** | Probe: 4xx/5xx, or ends on a different domain | Pause until fixed; recheck button |
+| Page | P2 | **Slow on phones** | Probe: load > 4 s on a mid-range phone profile; paid clicks vs landing-page views < 60% | Fix list (largest files, blocking scripts) |
+| Page | P3 | **Tags dropped** | Probe: `utm_*` / `fbclid` lost after redirects | Fix the redirect |
+| Signal | T1 | **Pixel not on the page** | Probe: no request to `facebook.com/tr` with PageView | Install steps |
+| Signal | T2 | **Wrong pixel** | Probe: pixel ID on page ≠ the ad set's promoted pixel | Swap the ID |
+| Signal | T3 | **Sales went silent** | Insights: purchases/leads drop to ~0 while clicks stay steady (change point) | Check checkout tracking; we name the day it broke |
+| Signal | T4 | **Counted twice** | Probe: duplicate events without a shared event ID; or results > clicks | Dedupe setting |
+| Learning | L1 | **Winners starved** | Best cost/result ad set < 15% of budget | Move budget (1 tap) — shown green, as money you could make |
+| Learning | L2 | **Stuck learning** | < 50 results/week on a conversion goal, frequent edits | Merge ad sets |
 
-| # | Leak | Rule (first version) | Action |
-|---|---|---|---|
-| L1 | **Spending, not selling** | Ad set/ad spent ≥ 2× target cost per result with 0 results | Pause it |
-| L2 | **Cost per result too high** | Cost/result ≥ 1.8× account median over ≥ 3 days | Lower budget or pause |
-| L3 | **Tired audience** | Frequency ≥ 3.5 and CTR down ≥ 25% vs its first days | New creative or wider audience |
-| L4 | **Price spike** | CPM up ≥ 35% vs the ad set's 7-day median with flat results | Check audience overlap / pause for a day |
-| L5 | **Dead hours** | Hours/days with ≥ 15% of spend and ≤ 5% of results (needs hour/day breakdown) | Schedule ads off those hours |
-| L6 | **Broken link** | Landing URL returns 4xx/5xx or redirects to a different domain (checked live) | Fix the link, pause until fixed |
-| L7 | **Clicks, no landing** | Link clicks ≫ landing-page views (< 50%) | Page is slow or broken on mobile |
-| L8 | **Winners starved** | Best cost/result ad set gets < 15% of budget | Move budget from L1/L2 here |
-| L9 | **Learning limbo** | Ad set edited often / < 50 results a week on a conversion goal | Merge ad sets or switch goal |
-
-L8 is a *gain*, not a leak: shown as "money you could make" in green.
+Money at risk = spend on the affected ads since the leak started (code, from insights). Saving
+estimate = that daily amount × 30. Forecast (TabPFN): probability each ad set misses its target
+cost tomorrow, from its last 14+ daily rows; shown only with ≥ 7 rows.
 
 ## 6. Features
 
-### P0: by tonight (Oct 18, IST)
+### P0: demo-ready by tonight
 | # | Feature | Acceptance |
 |---|---|---|
-| P0-1 | **Landing** with one promise, a 3-step "how it works", privacy line, pricing, "Try the demo account" | Judges reach a leak list in one click |
-| P0-2 | **Drop a report**: Meta Ads Manager CSV/XLSX export (Google Ads CSV next). Column auto-mapping across export languages/currencies; a tiny "map columns" fallback | Real exports from 2 accounts parse without editing |
-| P0-3 | **Leak report**: headline (leaked amount and %), leaks L1–L4, L6–L8 ranked by money, each with action + "why we think so" (the exact rows) | Correct on the demo account and on the first user's real export |
-| P0-4 | **Plain-words explanation** by the open model for each leak + a 3-line weekly summary; rules-only text if the model is unavailable | Model never changes a number (checked in code) |
-| P0-5 | **Demo account**: a realistic 30-day D2C account (8 campaigns, 21 ad sets, 64 ads) with planted leaks | Loads in under 2 s |
-| P0-6 | **Done / Snooze** per leak, saved locally; "Saved so far" counter | Persists on reload |
+| P0-1 | **Landing**: promise, the 5-step chain visual, "See a live demo account", "Connect Meta", pricing | Judge reaches leaks in one click |
+| P0-2 | **Demo account (live)**: a simulated D2C account that ticks every few seconds, with planted leaks across all 4 steps; you can pause, fix, undo, and watch "verified" appear | Works without any login |
+| P0-3 | **Connect Meta** (OAuth, dev-mode app, `ads_read` + `ads_management`): pick ad account; first sync of 30 days of daily insights per ad | Works on Rahul's and the first user's accounts |
+| P0-4 | **Watch**: hourly cron sync; daily probe of each distinct live landing URL in a headless phone browser (status, redirects, load time, tags, pixel requests and event names) | Probe report stored per URL per day |
+| P0-5 | **Leak feed**: ranked by ₹/day, grouped by step; leak card → detail with evidence (rows, probe trace, screenshot), plain explanation | Each leak reproducible by hand |
+| P0-6 | **Stop**: Pause / cut budget / move budget via the API, with confirm and **Undo** (we store the previous state) | Real pause and undo on a test ad set |
+| P0-7 | **Verify**: 24 h after a fix, recheck and mark "Fixed ✓ saved ₹x/week" or "Still leaking" | Saved-money counter updates |
 
-### P1: by tomorrow morning (what wins the categories)
+### P1: by tomorrow morning
 | # | Feature | Acceptance |
 |---|---|---|
-| P1-1 | **Tomorrow's forecast** (TabPFN): per ad set, chance it misses the target cost per result tomorrow, from its daily rows + day of week + spend trend; plus anomaly flags on daily spend | Backtest on the demo and real account: hit-rate shown in the post |
-| P1-2 | **Ask your account**: "Why did Tuesday cost so much?" answered only from the rows, with the rows shown as sources; says "Not in this report" otherwise | 12 test questions, no invented numbers |
-| P1-3 | **Client PDF / share link**: one-page "This week in your ads" for agencies | Opens on a phone |
-| P1-4 | **Pro checkout** (Dodo subscription) + sign-in with a 6-digit email code | Test purchase flips the plan |
-| P1-5 | **Morning watch** (Pro): forward the scheduled Ads Manager email report to `you@in.leakwatch.tech` (or upload daily); email "3 leaks this morning, ₹2,140 at risk" | One real email received and parsed |
-| P1-6 | **Model check** in Pulse: 30 labelled cases (leak explanations, Q&A) scored daily | Numbers in `content/numbers.md` |
+| P1-1 | **Guards** (opt-in rules written for you, e.g. "Pause any ad set that spends 2× target with no sale"); act overnight, log + undo | One guard fires on the demo and on a test ad set |
+| P1-2 | **Forecast** (TabPFN-3.5) + published backtest hit-rate | Number in `content/numbers.md` |
+| P1-3 | **Ask**: "Why did Tuesday cost so much?" grounded in rows + probe traces; "not in your data" when unknown | 12 test questions |
+| P1-4 | **Morning email**: "3 leaks, ₹2,140/day at risk, 1 fix verified" | Real email received |
+| P1-5 | **Pro checkout** (Dodo subscription, $19/month) + email code sign-in | Test purchase flips the plan |
+| P1-6 | **Model check + Sentry traces + Pulse tab** | Numbers + screenshots for the post |
 
-### P2: if time allows
-- Google Ads export; TikTok Ads export.
-- Live connection via the Meta Marketing API (needs app review, so post-hackathon).
-- Competitor ads glance (SerpApi Google Ads Transparency) on the leak "new creative" action.
-- WhatsApp morning message.
+### P2: after the hackathon
+CSV/XLSX upload for people who won't connect · Google Ads · Shopify/Razorpay orders to compare real
+sales vs reported (step 5) · WhatsApp alerts · client report PDF · Meta app review to go public.
 
-### Non-goals (this week)
-- Leakwatch never changes the ad account. It tells you; you click.
-- No creative generation, no "AI writes your ads".
-- No attribution modelling. We trust the results column the platform reports.
+### Non-goals
+No ad creation, no creative generation, no attribution modelling, no autonomous spending decisions
+beyond guards the user switched on.
 
 ## 7. Plans
 
 | | **Free** | **Pro, $19/month** (₹1,499) |
 |---|---|---|
-| Upload a report any time | ✓ | ✓ |
-| Leaks shown | Top 3, with amounts | All, with "why" and the exact rows |
-| Plain-words weekly summary | ✓ | ✓ |
+| Ad accounts | 1 | 5 (freelancers, small agencies) |
+| Account check | Daily | Hourly |
+| Landing-page probes | 3 URLs, weekly | Every live ad, daily, + recheck on demand |
+| Leaks shown | All, with ₹ at risk | All + evidence, explanation, Ask |
+| One-tap pause / budget / undo | ✓ | ✓ |
+| Guards (overnight auto-pause) | — | ✓ |
+| Fix verification + saved-money history | Last 7 days | Unlimited |
 | Tomorrow's forecast | — | ✓ |
-| Ask your account | 3 questions per report | Unlimited |
-| Morning watch by email (daily) | — | ✓ |
-| Ad accounts | 1 | Up to 5 (freelancers, small agencies) |
-| Client PDF / share link | — | ✓, with your logo |
-| History and "Saved so far" across weeks | This device | Synced, every device |
+| Morning email | Weekly | Daily |
 
-**Why $19:** the cheapest watcher on the market is $49+ and scales with spend. If Leakwatch catches
-one dead ad set a month, it pays for itself 5–20× at a $500/month spend. Running it costs us under
-$0.30 per Pro user per month (open model on our own account), so $19 flat is a real business.
-Annual: $190 (two months free). No lifetime plan: the morning watch has an ongoing cost.
+**Why $19:** cheapest watcher is $44–$49 and none look past the click; Ryze is $89. One caught
+pixel break at $500/month spend pays for years of Pro. Our cost: open model on our own Workers AI
+account + one browser probe per URL per day ≈ under $0.50 per Pro user per month.
 
-## 8. Data
-
-- **In the browser:** the uploaded file, parsed rows, computed leaks, Done/Snooze state (IndexedDB).
-- **Sent to the server per report:** the leak list (names of ad sets, amounts, rule evidence), never
-  the raw file. For Ask: only the rows the question needs.
-- **Stored on the server (Pro only):** account email, plan, saved watches (encrypted at rest),
-  daily report rows for forecasting, deleted on request in one click.
+## 8. Data and trust
+- Meta token encrypted at rest (AES-GCM, key in Worker secrets); revoke in one click; we request
+  only `ads_read` + `ads_management`.
+- We store daily insight rows (for forecasts) and probe traces. No customer personal data; probes
+  load public pages only, never submit forms or buy.
+- The explanation model runs on open weights on our own account; your numbers never train anyone's model.
+- "Delete everything" removes the token, rows and traces.
 
 ## 9. Success metrics
-- **Time to first leak:** < 10 s from landing (demo) / < 60 s from export (real).
-- **Accuracy:** every leak reproducible by hand from the rows (spot-checked on 2 real accounts).
-- **First user:** one real advertiser uses it on their own account and acts on at least one leak.
-- **Money found:** total "leaked this week" across real uploads, shown in Pulse.
-- **Pulse:** uploads, leaks found, Done rate, Ask questions, Pro checkouts, credits left.
+- Demo: first leak visible < 5 s; full loop (spot → pause → undo → verified) < 60 s.
+- Real: first user connects, sees ≥ 1 true leak, acts on it; we report what happened.
+- Pulse: connected accounts, leaks found (₹/day), actions taken, fixes verified, saved ₹, Pro checkouts.
 
 ## 10. Risks
 | Risk | Mitigation |
 |---|---|
-| Export formats differ (language, currency, column names, breakdowns) | Header synonyms table + "map columns" fallback; test with real exports |
-| Report has no conversion column (traffic/awareness goals) | Switch to cost per click/landing view as the "result"; say so |
-| Too little data for forecasts | Need ≥ 7 daily rows per ad set; otherwise "Forecast after 7 days" |
-| Model invents a number | Numbers rendered from code only; model text is checked for digits not present in the evidence and falls back to rules |
-| Free model rate limits | Credit guard + fallbacks (Workers AI → OpenRouter free → rules) |
+| Meta app in dev mode: only people with an app role can connect | First user added as tester; demo account for everyone else; app review after |
+| Wrong pause hurts a good ad | Confirm + undo; guards opt-in with conservative defaults; learning-phase ad sets excluded |
+| Probe blocked by bot protection | Real browser, phone profile, retry; mark "couldn't check" rather than guess |
+| Can't see Purchase on the page without buying | T3 uses the data (sales went silent while clicks steady); probe checks pixel presence + events up to the product page |
+| Model invents a number | Numbers rendered from code; digits in model text checked against evidence; rules fallback |
+| Rate limits | Credit guard + fallbacks (Workers AI → OpenRouter free → rules) |

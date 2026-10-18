@@ -1,50 +1,59 @@
-# Leakwatch: Design Brief
+# Leakwatch: Design Brief (v2)
 
-Use this file as the prompt for the design tool. Product context: [PRODUCT.md](PRODUCT.md).
+Paste this file into the design tool as the prompt. Product: [PRODUCT.md](PRODUCT.md). Research: [TEARDOWN.md](TEARDOWN.md).
+
+## One-line
+A live monitor for a small business's ad money: Sentry's issue feed crossed with a bank app, where
+every issue is an amount, a place in the ad → sale path, and a one-tap fix.
 
 ## Feel
-- **A calm money instrument, not a marketing dashboard.** Think a well-made bank statement crossed
-  with Linear and Sentry's issue list: quiet, dense where it matters, one number that hits.
-- **Money is the hero.** The biggest thing on any screen is an amount: "₹9,420 leaked this week".
-- **Red is rare.** Neutral paper/ink base, one warm "leak" colour (amber-red) used only on money at
-  risk, one green used only on money saved or gained. Everything else greyscale.
-- **Plain words.** Every metric is a sentence. Numbers in a tabular mono font.
-- **Light and dark** (auto). Desktop first (1280–1440 wide), fully usable at 390 wide.
+- **Calm instrument, alive.** It's watching right now: a small pulsing "Watching · last check 4 min
+  ago" status, numbers that tick, leaks that appear and resolve. Never a dashboard of 20 charts.
+- **Money is the hero.** Biggest type on every screen is an amount (₹/day at risk, ₹ saved).
+- **Colour has meaning only:** ink/paper neutrals; **leak** = warm amber-red (money at risk);
+  **saved/gain** = green; **checking** = blue. Nothing else coloured.
+- **Plain words.** Each metric is a sentence. Numbers in a tabular mono.
+- Light + dark. Desktop first (1280–1440), fully usable at 390 wide.
 
 ## Brand
-- Name: **Leakwatch**. Mark: a single drop inside a ring (a drop being watched), works at 16 px.
-- Type: a grotesk for UI (Inter / Instrument Sans / Geist), a mono for numbers (JetBrains Mono /
-  IBM Plex Mono / Geist Mono). One serif accent for the landing headline is allowed.
-- Currency-aware: show ₹, $, €, £ as in the user's report.
+- **Leakwatch.** Mark: a drop inside a ring/eye, works at 16 px.
+- UI: Geist / Inter / Instrument Sans. Numbers: Geist Mono / JetBrains Mono. Optional serif for the landing headline.
+- Currency from the account (₹, $, €, £).
+
+## The signature element: the chain
+A horizontal 5-node path used everywhere: **Spend → Click → Page → Tracking → Sale**. Each node
+shows health (green / amber / red / grey "not checked") and ₹ flowing through it. A leak is drawn
+as a drip at the node where money escapes. On mobile it becomes a vertical stepper.
 
 ## Screens
 | # | Screen | Must show |
 |---|---|---|
-| 1 | **Landing** (desktop + mobile) | Headline "Find the ad money you're leaking." · sub "Drop your Ads Manager report. In 10 seconds you'll know what to pause, what to fix, and what it saves you." · big drop zone *on the landing itself* + "Try a demo account" · 3 steps (Export → Drop → Fix) · a real-looking leak card as the hero visual · privacy line "Your file is read in your browser." · pricing (Free / Pro $19) · footer credits partners |
-| 2 | **Reading state** | File name, row count, "Checking 21 ad sets across 30 days…", a short checklist ticking through detectors (Spending, not selling ✓ · Tired audience ✓ · Links …). 2–5 seconds, must feel fast |
-| 3 | **Leak report (home)** | Header: account name, date range, spend. Hero: "₹9,420 of ₹31,200 leaked this week (30%)" + "Fix these and save about ₹38k a month". Leak list ranked by money: each row = severity dot, plain title ("'Lookalike 2%' spent ₹3,850 and sold nothing"), amount at risk, action button ("Pause it"), Done / Snooze. A green "Money you could make" row for starved winners. Right rail (desktop): weekly summary (3 lines), Tomorrow's forecast, Ask box |
-| 4 | **Leak detail** (side panel / sheet) | Why we think so: the exact rows as a small table, a tiny sparkline of the metric, the rule in one sentence, "How to do it in Ads Manager" steps (3 max), confidence chip, "Mark done" |
-| 5 | **Tomorrow's forecast** | Per ad set: chance it misses your target tomorrow as a bar (e.g. 78%), "likely / maybe / fine", the 2 reasons. Explain "Based on its last 14 days" |
-| 6 | **Ask your account** | One input with 3 suggested questions; answer card with source rows; honest "Not in this report" state |
-| 7 | **Client report** (PDF / share link) | One page: this week's spend, leaked, saved, top 3 fixes, the agency's logo slot |
-| 8 | **Pricing + checkout sheet** | Free vs Pro $19/month table; email code sign-in (6 boxes) before checkout |
-| 9 | **Morning watch setup** (Pro) | Your forwarding address `rahul-7f2@in.leakwatch.tech` with copy button; 3 steps to schedule the report in Ads Manager; "Waiting for the first report…" state |
-| 10 | **Empty / error states** | Wrong file ("This looks like a bank statement, not an ads report"), no conversions column, too little data for forecasts, model busy (rules still shown) |
-| 11 | **Saved so far** | A single growing number "₹21,600 saved since Oct 12" + list of fixes you marked done |
+| 1 | **Landing** | Headline "Find where your ad money leaks, and stop it." · sub "Leakwatch follows every ad from spend to sale, puts a price on each break, and fixes it with one tap. $19/month." · CTA **See a live demo account** + secondary **Connect Meta** · hero: the chain animating with one drip at "Tracking" ("Purchase stopped reaching Meta · ₹1,600/day") · 3 blocks: Watch / Pinpoint / Stop & verify · "vs $49–$489 tools that stop at the click" strip · pricing Free / Pro · trust line (read-only by default, undo everything, open model) |
+| 2 | **Connect** | Meta button → choose ad account (list with spend last 30 d) → "First check running" checklist ticking: syncing 30 days · probing 6 landing pages · checking pixels · pricing leaks. ≤ 20 s feel |
+| 3 | **Home: Leak feed** | Top: status pill "Watching · next check 12:00" + account switcher. Hero: "₹3,940/day leaking right now" with the chain showing where. Below: "₹21,600 saved since Oct 12" (green). Feed of leak cards ranked by ₹/day, filter chips by step. Right rail: Guards on/off, Tomorrow's forecast, Ask |
+| 4 | **Leak card** (in feed) | Step chip ("Tracking") · severity dot · title in plain words ("Sales went silent on Oct 14") · ₹/day + since when · primary action button ("Pause 3 ad sets" / "Recheck page") · secondary "Why?" |
+| 5 | **Leak detail** (side panel / full sheet on mobile) | The chain with the broken node highlighted · evidence: mini chart with the change point marked, the rows, or the **probe trace** (phone screenshot of the landing page, timeline of requests: page 200 → redirect → pixel PageView ✓ → ViewContent ✓ → Purchase ✗, load time) · plain explanation (3 lines) · fix steps (≤ 3) · confidence · actions |
+| 6 | **Confirm + Undo** | Confirm sheet: "Pause 'Lookalike 2%'? It spent ₹3,850 this week with 0 sales." → toast "Paused · Undo" (10 s) → card moves to "Waiting to verify (24 h)" |
+| 7 | **Verified** | Card state "Fixed ✓ — saving ₹550/day" with the amount flying into the Saved counter; or "Still leaking" with next step |
+| 8 | **Guards** | List of plain-sentence rules with toggles ("Pause any ad set that spends 2× your target with no sale"), target cost input, activity log with undo per action |
+| 9 | **Page check** (per landing URL) | Phone screenshot, load time bar vs 4 s, redirect chain, tags kept/lost, pixel ID + events seen, which live ads point here and their spend, "Recheck now" |
+| 10 | **Forecast** | Per ad set: chance it misses target tomorrow (bar), likely/maybe/fine, 2 reasons, "based on last 14 days", backtest accuracy note |
+| 11 | **Ask** | One input + 3 suggestions; answer with source rows / traces; honest "not in your data" |
+| 12 | **Pricing + checkout** | Free vs Pro $19 table; email-code sign-in (6 boxes) before Dodo checkout |
+| 13 | **Morning email** | Subject "3 leaks · ₹2,140/day at risk · 1 fix verified"; 3 rows + one button |
+| 14 | **States** | Demo banner ("This is a demo account — numbers are simulated"), no leaks ("Nothing leaking. Last check 4 min ago." — calm, celebratory), probe blocked ("Couldn't check this page"), token expired, not enough days for forecast |
 
 ## Components
-- Leak row (severity dot · title · amount · action · done/snooze)
-- Money hero (amount, % bar showing leaked vs working spend)
-- Evidence table (compact, mono numbers, highlighted offending cell)
-- Forecast bar
-- Drop zone (idle / hover / reading / error)
-- Plan card, email-code input, toast "Marked done. ₹3,850/week saved."
+Chain (5 nodes, states, drip) · Status pill (watching/checking/paused) · Money hero (count-up) ·
+Leak card (5 states: new, acting, waiting to verify, fixed, still leaking) · Evidence chart with
+change point · Probe timeline (request rows with ✓/✗) · Phone screenshot frame · Confirm sheet ·
+Undo toast · Guard row with toggle · Forecast bar · Plan card · 6-box code input.
 
 ## Motion
-- Numbers count up once on first render (300 ms). Leak rows stagger in (40 ms each).
-- Done: row collapses, amount flies into the "Saved so far" counter.
-- Respect reduced motion.
+Status dot pulses (2 s). New leak slides into the feed with a short amber flash. Numbers count up
+once. Fixed: card collapses and the amount flies into "Saved". Chain drip falls slowly at the
+broken node. Respect reduced motion.
 
-## References to borrow from
-Sentry issues list (ranking + severity), Linear (density, calm), Mercury / Ramp (money as type),
-Granola landing (calm product hero), Stripe Sigma empty states.
+## References
+Sentry issues (ranking, states), Linear (density, calm), Mercury / Ramp (money as type), Vercel
+deployments (live status), Checkly / Better Stack (uptime checks, request timelines), Granola landing (calm hero).

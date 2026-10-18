@@ -1,46 +1,50 @@
 # Leakwatch: Stack
 
-Same shape as Memoria and Almanac (see the shared playbook): static frontend on Vercel, API on a
-Cloudflare Worker, slow jobs on Render, one Neon database, Dodo for payments, Pulse for analytics.
+Same shape as Memoria and Almanac: static frontend on Vercel, main API on a Cloudflare Worker,
+slow jobs on Render, one Neon database, Dodo payments, Pulse analytics.
 
 ```
- Browser (Vercel, static)                       Cloudflare Worker `leakwatch-edge`            Render `leakwatch-predict`
-┌──────────────────────────────────┐  leaks   ┌──────────────────────────────────┐  rows  ┌───────────────────────────┐
-│ Parse CSV/XLSX (Papa / SheetJS)  │────────▶│ /explain  → Gemma (Workers AI)    │──────▶│ TabPFN-3.5 (Prior Labs     │
-│ Map columns, normalise currency  │         │   fallback OpenRouter free → rules│       │ API): miss-target forecast │
-│ Detectors L1–L9 (pure functions) │◀────────│ /ask      → Gemma over given rows │◀──────│ + daily spend anomalies    │
-│ Leak report, Done/Snooze (IDB)   │  text   │ /linkcheck → HEAD landing URLs    │       └───────────────────────────┘
-│ Demo account (JSON, bundled)     │         │ /forecast → proxy to Render       │
-└──────────────────────────────────┘         │ /auth, /billing (Dodo), /events   │──────▶ Neon (accounts, watches,
-                                             │ email() handler: morning watch    │        events, Pulse views)
-                                             └──────────────────────────────────┘
+ Browser (Vercel)                 Cloudflare Worker `leakwatch-edge`                 Render `leakwatch-jobs` (Node + Python)
+┌───────────────────────┐  API  ┌───────────────────────────────────────────┐ jobs ┌───────────────────────────────────────┐
+│ Landing, demo (sim    │──────▶│ /auth (email code) /meta/oauth /accounts   │─────▶│ probe: Playwright, phone profile →    │
+│ ticks in the browser),│       │ /leaks /actions (pause, budget, undo)      │      │  status, redirects, load, tags,       │
+│ leak feed, detail,    │◀──────│ /explain /ask → Gemma (Workers AI)         │◀─────│  facebook.com/tr requests, screenshot │
+│ guards, ask           │       │   → OpenRouter :free → rules               │      │ forecast: TabPFN-3.5 (Prior Labs API) │
+└───────────────────────┘       │ cron hourly: sync Meta insights → detect   │      │ daily model check                     │
+                                │ cron daily: queue probes, verify fixes,    │      └───────────────────────────────────────┘
+                                │   guards, morning email                    │
+                                └──────────────┬────────────────────────────┘
+                                               ▼
+                                Neon: accounts, meta_tokens (encrypted), ads, insights_daily,
+                                probes, leaks, actions (with previous state), guards, events, pulse.*
 ```
 
 ## Choices
-
 | Layer | Pick | Why |
 |---|---|---|
-| Parsing | Papa Parse (CSV) + SheetJS (XLSX) in the browser | The file never leaves the laptop |
-| Detectors | Plain TypeScript functions, unit-tested on the demo account | Numbers must be exact and explainable; no model does maths |
-| Explanations + Ask | **Gemma 4 on Cloudflare Workers AI** (97.6% F1 / 1.9 s in our Week 1 check) → Gemma on OpenRouter `:free` → rules text | Open weights, runs on our own account, no per-seat API bill |
-| Forecast + anomalies | **TabPFN-3.5** via the Prior Labs API on Render | Built for small tables like "21 ad sets × 30 days"; no training |
-| Link check | Worker `fetch` with HEAD/GET, 3 s timeout | Catches the broken landing page |
-| Morning watch | Cloudflare Email Routing → Worker `email()` handler on `in.leakwatch.tech` | Daily data without Meta app review |
-| Payments | Dodo Payments subscription ($19/month), signed webhook | Same as previous weeks, now monthly |
-| Analytics | Pulse contract views in Neon | One dashboard for every week |
-| Tracing | Sentry agent tracing on /explain and /ask | Latency, tokens, fallbacks visible |
+| Ad data | Meta Marketing API (Graph v26): `/act_{id}/insights` level=ad, daily breakdown; `POST /{adset_id}` status/daily_budget for actions | Dev-mode app + standard access covers accounts where app-role users are admins |
+| Detectors | Pure TypeScript functions, unit-tested against the demo dataset | Exact, explainable numbers |
+| Probe | Playwright (Chromium, phone viewport + slow-4G throttling) on Render; records every request, filters pixel calls (`facebook.com/tr?id=…&ev=…`) | Real browser = what the customer sees; Render credits; long jobs |
+| Explain / Ask | **Gemma 4 on Cloudflare Workers AI** (97.6% F1, 1.9 s in our Week 1 check) → Gemma `:free` on OpenRouter → rules | Open weights, our account, flat cost |
+| Forecast | **TabPFN-3.5** via Prior Labs API on Render | Small tables ("24 ad sets × 30 days"), no training |
+| Payments | Dodo subscription $19/month, signed webhook | Same as previous weeks, monthly |
+| Tracing | Sentry agent tracing on /explain, /ask, probe | Latency, tokens, fallbacks |
+| Analytics | Pulse contract views | One dashboard for every week |
 
-## Why not OpenCode Zen / free DeepSeek as the product's model?
+## Where REA fits
+REA ([morluto/rea](https://github.com/morluto/rea)) is an MCP for reverse-engineering apps and
+websites (browser observation, HAR captures, JS bundle analysis). We use it **while building**, in
+the agent session, to:
+1. observe a healthy Shopify / WooCommerce checkout and record exactly what the Meta pixel sends
+   (`fbevents.js` → `facebook.com/tr` params: `id`, `ev`, `eid` for dedup, `cd[...]`), and what a
+   broken one looks like (no `ev=Purchase`, wrong `id`, double fire without `eid`);
+2. reverse-engineer how redirects and link shorteners drop `fbclid` / `utm_*`;
+3. turn those observations into the probe's rules (T1–T4, P1–P3) and fixtures for tests.
 
-OpenCode Zen does expose free models (DeepSeek V4 Flash Free among them) on an OpenAI-compatible
-endpoint, so technically the app could call it. We use it as a **coding agent while building**, not
-as the product's runtime, because:
+The production probe is our own Playwright job (REA runs locally inside an agent, not as a SaaS
+backend). The REA session is shared in the post.
 
-- the free list changes without notice and is limited per IP, meant for trying the coding agent;
-- free-period traffic may be used to improve the model, which breaks our "your ad data stays
-  yours" promise to paying users;
-- a paid product needs a model we control: Gemma on our own Workers AI account, with fallbacks.
-
-DeepSeek stays an option as a fallback through OpenRouter's free tier if it scores well in the
-model check. Hosting our own model on Hugging Face Inference Endpoints costs money per hour of
-uptime; Workers AI bills per request and costs nothing at our volume.
+## Why not OpenCode Zen / free DeepSeek as the runtime
+OpenCode Zen's free models (incl. DeepSeek V4 Flash Free) are on an OpenAI-compatible endpoint, but
+the list changes, limits are per IP, and free traffic may be used for training — wrong for client ad
+data. We use OpenCode as a coding agent only. HF Inference Endpoints bill per hour; Workers AI per request.
