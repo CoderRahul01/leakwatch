@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { ApiError, PREVIEW, requestCode, validEmail, verifyCode } from '../lib/api';
-import { setSession, useSession } from '../lib/session';
+import { ApiError, requestCode, validEmail, verifyCode } from '../lib/api';
+import { useSession } from '../lib/session';
 import { CodeInput } from '../components/UI';
 import { Logo } from '../components/Logo';
-import { ArrowRight, ChevronLeft, Info, Mail, Refresh } from '../components/Icons';
+import { ArrowRight, ChevronLeft, Mail, Refresh } from '../components/Icons';
 
 const RESEND_S = 30;
 
@@ -18,7 +18,6 @@ export function SignIn() {
   const [code, setCode] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [previewCode, setPreviewCode] = useState<string | null>(null);
   const [resendIn, setResendIn] = useState(0);
 
   useEffect(() => {
@@ -32,8 +31,7 @@ export function SignIn() {
     if (!validEmail(email)) return setErr('That email doesn’t look right.');
     setBusy(true);
     try {
-      const r = await requestCode(email);
-      setPreviewCode(r.previewCode ?? null);
+      await requestCode(email);
       setStep('code');
       setCode('');
       setResendIn(RESEND_S);
@@ -49,13 +47,11 @@ export function SignIn() {
     setErr(null);
     setBusy(true);
     try {
-      const r = await verifyCode(email, c);
-      setSession({ email: r.email });
+      await verifyCode(email, c);
       nav(next, { replace: true });
     } catch (e) {
       setErr(e instanceof ApiError ? e.message : 'Something went wrong. Try again.');
       setCode('');
-      if (e instanceof ApiError && (e.code === 'expired' || e.code === 'too_many' || e.code === 'no_code')) setPreviewCode(null);
     } finally {
       setBusy(false);
     }
@@ -72,7 +68,7 @@ export function SignIn() {
         <Link to="/"><Logo /></Link>
         <div className="auth-quote">
           <h2 className="h-lg">Every rupee from ad to sale, watched.</h2>
-          <p className="lede">Sign in with a code. No password to forget.</p>
+          <p className="lede">Sign in with a code to keep Pro on every device. No password to forget.</p>
         </div>
         <div className="auth-tags" aria-hidden>
           <span className="ftag-in" style={{ ['--c' as string]: 'var(--tag-coral)', transform: 'rotate(-7deg)' }}>Pixel went quiet</span>
@@ -86,7 +82,7 @@ export function SignIn() {
           {step === 'email' ? (
             <form onSubmit={(e) => { e.preventDefault(); send(); }}>
               <span className="auth-ico"><Mail size={22} /></span>
-              <h1 className="h-md">Sign in or start free</h1>
+              <h1 className="h-md">Sign in</h1>
               <p className="muted small">We email you a 6-digit code.</p>
               <div className="field" style={{ marginTop: 24 }}>
                 <label htmlFor="email">Work email</label>
@@ -103,12 +99,6 @@ export function SignIn() {
               <button className="back" onClick={() => { setStep('email'); setErr(null); }}><ChevronLeft size={16} /> Change email</button>
               <h1 className="h-md">Check your email</h1>
               <p className="muted small">We sent a 6-digit code to <b>{email.trim().toLowerCase()}</b>. It works for 10 minutes.</p>
-              {PREVIEW && previewCode && (
-                <div className="state-box signal" style={{ marginTop: 16 }}>
-                  <Info size={15} />
-                  <span>Preview mode, no email is sent. Your code is <b className="num">{previewCode}</b></span>
-                </div>
-              )}
               <div style={{ marginTop: 24 }}>
                 <CodeInput value={code} onChange={setCode} disabled={busy} bad={!!err} />
                 {err && <p className="err" role="alert" style={{ marginTop: 10 }}>{err}</p>}
@@ -122,7 +112,7 @@ export function SignIn() {
             </div>
           )}
         </div>
-        <p className="mist small auth-demo">Just looking? <Link to="/demo" className="link">Open the live demo</Link>, no sign-in.</p>
+        <p className="mist small auth-demo">No account needed to <Link to="/check" className="link">check a page</Link>, <Link to="/import" className="link">import your ads</Link> or <Link to="/demo" className="link">try the demo</Link>.</p>
       </main>
     </div>
   );
@@ -130,6 +120,6 @@ export function SignIn() {
 
 /** Only allow redirects back into this app. */
 function safeNext(n: string | null): string {
-  if (!n || !n.startsWith('/') || n.startsWith('//')) return '/connect';
+  if (!n || !n.startsWith('/') || n.startsWith('//')) return '/app';
   return n;
 }

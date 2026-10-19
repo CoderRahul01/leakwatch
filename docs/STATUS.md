@@ -1,56 +1,83 @@
 # Leakwatch: build status
 
-Updated Oct 18, 2026. Read this first, then `CLAUDE.md` for the rules.
+Updated **Oct 19, 2026, 23:30 IST**. Branch `wip/paid-launch`. Read this first, then `CLAUDE.md` for the rules.
 
-## Run it
-```bash
-npm install          # from repo root (npm workspaces: shared, web)
-npm test             # 26 unit tests in shared/
-npm run dev          # web on http://localhost:5173
-npm run build        # web/dist
-```
-With no `VITE_API_URL` the web app runs in **preview mode**: sign-in codes show on screen, the
-sample account stands in for Meta, checkout flips Pro on locally. Every preview shortcut is
-labelled on screen. Set `VITE_API_URL` once `edge/` exists.
+## Goal right now
+Launch Leakwatch publicly as a paid product: anyone can use it today (no Meta app review needed),
+Pro at **$19/month** through Dodo, on **leakwatch.tech** (free first year via hacktoberfest.com/my/promos).
 
-## Done
-| Area | What | Where |
-|---|---|---|
-| Data model | Types for accounts, ads, insights, probes, leaks, actions, guards | `shared/src/types.ts` |
-| Demo account | 8 campaigns, 24 ad sets, 70 ads, 30 days, planted leaks for every detector, phone-probe results | `shared/src/demo-account.ts` |
-| Detectors | S1–S4, P1–P3, T1–T4, L1. Pure functions; page/tracking root causes suppress spend flags | `shared/src/detectors.ts` |
-| Guards | 3 opt-in rules, pure evaluation | `shared/src/guards.ts` |
-| Forecast | Transparent fallback (rolling 3-day cost vs target, ≥7 days only). TabPFN not wired | `shared/src/forecast.ts` |
-| Ask | Grounded answers from rows, "not in your data" otherwise | `shared/src/ask.ts` |
-| Model text guard | Digit check + rules fallback | `shared/src/explain.ts` |
-| Live engine | Ticks demo, actions with stored previous state, Undo, verify, guards, events | `shared/src/sim.ts` |
-| Tests | 26 vitest tests | `shared/test/` |
-| Landing | Hero with floating leak tags, scroll chain story, loop, live preview, compare, people, connections, pricing, FAQ, footer with partners | `web/src/pages/Landing.tsx` |
-| Auth UI | Email + 6-box code, resend timer, expiry, tries, paste | `web/src/pages/SignIn.tsx` |
-| Connect UI | Meta permissions, account picker (disabled / view-only cases), first-check checklist | `web/src/pages/Connect.tsx` |
-| App | Feed, leak detail drawer, confirm + Undo toast, verified fly-to-saved, pages + page check, guards, forecast, ask, activity, settings (Meta, Claude connector, morning email preview, plan, delete everything), Pro gating, banners (demo, preview, expired token, offline) | `web/src/app/` |
-| Design system | Tokens, inset lighting, animated edge, chain, motion, reduced motion | `web/src/styles/` |
-| Deploy config | Vercel: Root Directory `web`, SPA rewrite | `web/vercel.json` |
+## The product, honestly (decided Oct 19)
+Meta's direct connection needs Meta's app review, so v1 works for everyone without it:
+1. **Free page check** (`/check`, no sign-up): paste the page an ad opens → a real phone browser
+   (Cloudflare Browser Rendering) opens it with test utm/fbclid → status, redirects, time until main
+   content shows (LCP on 4G), tags kept, Meta pixel IDs + events, consent banner, screenshot.
+2. **Account report** (`/import`): upload an Ads Manager export (CSV, ad level, Breakdown → By time → Day).
+   Parsed **in the browser** (`shared/src/import.ts`), landing pages checked via the API, all detectors
+   run, leaks priced. Ad data never leaves the device. Fixes are done in Ads Manager and **verified on
+   the next import** (`shared/src/report.ts` `ReportEngine`); page fixes are verified by a recheck.
+3. **Direct Meta connect**: waitlist only (`POST /api/waitlist`) until Meta approves.
+4. **Pro $19/mo**: daily watch of up to 25 pages with email alerts, 150 checks/day (free: 5), forecast,
+   Ask, explanations. Guards need the direct connection → shown as "coming with Meta connect".
 
-## Not done (in build order)
-1. **Deploy web to Vercel**: import repo, Root Directory `web`, no env vars. Not done yet (no token in the build session).
-2. **Mobile QA**: 390 px screenshots taken but not reviewed. Check feed, drawer sheet, chain vertical layout, tabs.
-3. **`edge/` Cloudflare Worker `leakwatch-edge`** (nothing exists yet). Endpoints the web already calls (`web/src/lib/api.ts`):
-   - `POST /auth/code {email}`, `POST /auth/verify {email, code}` → session cookie
-   - `POST /meta/oauth/start` → `{redirect}`; callback stores token AES-GCM encrypted; `GET /accounts`
-   - `POST /billing/checkout` → `{url}` (Dodo, $19/month) + signed webhook flips plan
-   - `/mcp` Claude connector: tools `list_leaks`, `get_leak`, `ask`, `page_check`, `propose_pause` (never changes the account; user confirms in app)
-   - Still to design: `/leaks`, `/actions` (pause / budget / undo via Meta API with previous state), `/explain` (Gemma on Workers AI, run `explanationFor` digit check), hourly cron sync → `detectLeaks`, daily verify + guards + morning email
-   - `edge/sql/` migrations for Neon (tables listed in `docs/STACK.md`)
-   - The web app still drives everything from `DemoEngine`; it needs a data source that reads from the API when `VITE_API_URL` is set.
-4. **`jobs/` on Render**: Playwright phone probe producing `Probe` objects (rules in `docs/STACK.md`, REA notes), TabPFN forecast, daily model check.
-5. **Sentry, Pulse views, morning email sending.**
-6. **`e2e/`**: Playwright tests against production (demo loop: open leak → pause → undo → verified).
-7. **Content** for the post (`../content/` in the private workspace).
+## Live
+| What | Where |
+|---|---|
+| API worker `leakwatch-edge` | https://leakwatch-edge.rahulpandey-creates.workers.dev (`/api/health`) |
+| Database | Neon project `leakwatch` (`curly-heart-07165495`), schema + Pulse views applied (`edge/sql`, `npm run migrate`) |
+| Dodo product (live) | **Leakwatch Pro** `pdt_0Nq5oqvd3pMBsssodefKT`, $19/month · webhook → `/api/billing/webhook` |
+| Worker secrets set | DATABASE_URL, CRON_SECRET, OPENROUTER_API_KEY, DODO_PRODUCT_ID, DODO_WEBHOOK_SECRET (local copy in `edge/.dev.vars`, git-ignored) |
+| Web | **not deployed yet** (Vercel project `leakwatch` to create, Root `web`) |
+
+Verified on production (Oct 19): page checks on 8 real stores (healthy, 404, slow, no pixel,
+tag manager → "couldn't confirm", 429 → "couldn't check"); warm-browser reuse avoids the launch limit;
+checkout link carries product + visitor; forged webhook → 401; signed `subscription.active` → Pro;
+`/me` hands the paying browser a session; `subscription.expired` → free; account delete works.
+
+## Done this session
+- `edge/` worker: `src/index.js` (routes, limits, browser-time budget with 10% Pro reserve, hourly cron
+  watch run + alert emails, Pulse credits), `auth.js` (email code), `billing.js` (Dodo), `probe.js`
+  (phone probe + pure `classify()`), `explain.js` (Gemma on Workers AI → OpenRouter, digit check), `email.js`.
+  Tests: `cd edge && npm test` (10 pass).
+- `shared/`: `import.ts` (CSV → Dataset, tolerant headers, clear errors, sample export), `report.ts`
+  (ReportEngine), detector fixes (T4 needs two un-mergeable copies; T2 skipped when the ad set's pixel
+  is unknown). `npm test` → 35 pass.
+- `web/src/lib`: `api.ts` rewritten for the real API (visitor key + Bearer token, `/api` same-origin),
+  `session.ts` (token, plan, reportName), `report-store.ts`, `engine.tsx` (`EngineProvider make={…}`,
+  `Engine = DemoEngine | ReportEngine`). `pages/SignIn.tsx` updated.
+
+## Next (in order)
+1. **Web typecheck is broken mid-refactor** (`npx tsc --noEmit -p web`). Finish:
+   - `pages/Import.tsx` replacing `Connect.tsx` (reuse its CSS: connect-page, cstep, checklist): file
+     input + how-to-export steps + options (name, target cost, fallback URL, pixel ID) + "download a
+     sample" (`toAdsManagerCsv(createDemoWorld().dataset)`) + Meta waitlist box. On import: parse →
+     `checkPage(url, {source:'report'})` for each URL up to `checksLeft` → `new ReportEngine(ds, previousMemory, {fresh:true})`
+     → `saveReport` → `/app`.
+   - `pages/Check.tsx` (`/check?url=`): input, result with screenshot (`<img>` in PhoneFrame when present),
+     findings, `ProbeTimeline`, `LoadBar`; CTAs: watch daily (Pro, `addWatch`), import account.
+   - `pages/WelcomePro.tsx` (`/welcome-pro`, Dodo redirect): poll `refreshMe()` until plan = pro.
+   - `AppRoot`: account mode needs a stored report (not sign-in) → else `/import`;
+     `make={() => new ReportEngine(stored.dataset, stored.memory)}` + `onChange` → `saveReport`.
+   - `useLeakAction` confirm in report mode: "Do this in Ads Manager, then tap I did it; we confirm on
+     your next import" (no "changes your Meta account now"). Recheck action → `checkPage` → `engine.applyProbe`.
+   - `Shell`, `Settings` (plan, sign in/out, delete, re-import, watched pages; drop Meta/Claude/morning
+     email stubs), `Pricing` (rows must match the real limits above), `Landing` CTAs (Check a page free /
+     Try the demo / Import your account), `SiteChrome`, `LeakDetail` (`explainLeak` + `explanationFor`),
+     `main.tsx` routes, `refreshMe()` + `track('visit')` on load.
+2. Vercel: project `leakwatch`, Root `web`, `web/vercel.json` rewrite `/api/(.*)` →
+   `https://leakwatch-edge.rahulpandey-creates.workers.dev/api/$1` before the SPA rewrite.
+3. leakwatch.tech: claim at hacktoberfest.com/my/promos (needs Rahul's login), add to Vercel, set
+   `PUBLIC_URL` var on the worker, update Dodo redirect.
+4. Email: `MAILER_ON=1` once almanac-edge is deployed with the `Mailer` entrypoint (code committed in
+   the almanac repo, `edge/src/email.js`; deploy was blocked by auto mode — needs Rahul's OK), **or** set
+   `RESEND_API_KEY` + `EMAIL_FROM` secrets on leakwatch-edge. Until then sign-in shows "opens soon";
+   paying still works (Pro attaches to the paying browser via `/me`).
+5. Cloudflare **Workers Paid ($5/mo)** for more browser time (free = 10 min/day ≈ 40 checks), then raise
+   `BROWSER_DAILY_SECONDS`.
+6. Pulse: create `pulse_ro` with SQL (see `_shared/PLAYBOOK.md`), add to `PULSE_PROJECTS`.
+7. E2E on production (Playwright): check → import sample → act → re-import → fixed; checkout opens.
+8. Post + video + X/LinkedIn (in Rahul's voice, only after a yes).
 
 ## Known gaps / decisions
-- Dark theme only (brand). Design brief asked for light + dark.
-- Fonts: Space Grotesk (display), Inter 300 (body), JetBrains Mono (numbers), self-hosted via @fontsource.
-- Demo day stops at 23:38 sim time and holds; no day rollover.
-- Leak verification in the demo takes ~20 s (24 h in real accounts).
-- Brand logos of partners are text only (no trademark artwork).
+- Dark theme only (brand). Fonts self-hosted via @fontsource.
+- Demo mode still ticks a simulated account; it stays as the "see it work in 30 seconds" path.
+- Free limits: 5 checks/day per browser (15 per IP), 10 explanations/day. Pro: 150 checks, 300 explanations, 25 watched pages.

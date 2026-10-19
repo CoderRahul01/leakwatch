@@ -1,9 +1,12 @@
-// Talks to the leakwatch-edge worker. With no VITE_API_URL the app runs in preview mode:
-// codes are generated in the browser and shown on screen, and the sample account stands in for Meta.
-// Preview mode always says so on screen; nothing pretends to be real.
+// Talks to the leakwatch-edge worker. In production the site rewrites /api/* to the worker, so calls
+// are same-origin; VITE_API_URL points somewhere else for local development.
+// Every request carries this browser's random visitor key (only its hash is stored on the server)
+// and, once signed in, the session token.
 
-const BASE = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, '') ?? '';
-export const PREVIEW = !BASE;
+import type { Leak, Probe } from '@shared';
+import { getSession, setSession, clearSession } from './session';
+
+const BASE = ((import.meta.env.VITE_API_URL as string | undefined) ?? '').replace(/\/$/, '') + '/api';
 
 export class ApiError extends Error {
   constructor(public code: string, message: string) {
@@ -11,27 +14,68 @@ export class ApiError extends Error {
   }
 }
 
-async function call<T>(path: string, body?: unknown): Promise<T> {
+const VKEY = 'leakwatch.visitor';
+let memoryKey: string | null = null;
+export function visitorKey(): string {
+  try {
+    const k = localStorage.getItem(VKEY);
+    if (k && /^[a-f0-9]{64}$/.test(k)) return k;
+  } catch {
+    /* storage blocked */
+  }
+  if (!memoryKey) {
+    memoryKey = [...crypto.getRandomValues(new Uint8Array(32))].map((b) => b.toString(16).padStart(2, '0')).join('');
+    try {
+      localStorage.setItem(VKEY, memoryKey);
+    } catch {
+      /* memory only */
+    }
+  }
+  return memoryKey;
+}
+
+async function call<T>(path: string, body?: unknown, { timeoutMs = 20_000 } = {}): Promise<T> {
+  const headers: Record<string, string> = { 'X-Leakwatch-Key': visitorKey() };
+  const token = getSession().token;
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (body !== undefined) headers['Content-Type'] = 'application/json';
   let res: Response;
   try {
     res = await fetch(BASE + path, {
       method: body === undefined ? 'GET' : 'POST',
-      headers: body === undefined ? undefined : { 'content-type': 'application/json' },
+      headers,
       body: body === undefined ? undefined : JSON.stringify(body),
-      credentials: 'include',
+      signal: AbortSignal.timeout(timeoutMs),
     });
-  } catch {
+  } catch (e) {
+    if ((e as Error).name === 'TimeoutError') throw new ApiError('timeout', 'That took too long. Try again.');
     throw new ApiError('offline', "We couldn't reach Leakwatch. Check your connection and try again.");
   }
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && data.code === 'signed_out' && token) clearSession();
   if (!res.ok) throw new ApiError(data.code ?? `http_${res.status}`, data.message ?? 'Something went wrong. Try again.');
   return data as T;
 }
 
-const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// ------------------------------------------------------------------ account
+export interface Me {
+  account: { email: string; plan: 'free' | 'pro'; proUntil: string | null } | null;
+  token: string | null;
+  checksLeft: number;
+  limits: { checks: number; explains: number; watches: number };
+  mail: boolean;
+  billing: boolean;
+}
 
-// ------------------------------------------------------------------ email code sign-in
-const pending = new Map<string, { code: string; expires: number; tries: number }>();
+/** Refreshes plan and sign-in from the server. A browser that just paid gets its session here. */
+export async function refreshMe(): Promise<Me> {
+  const me = await call<Me>('/me');
+  if (me.token) setSession({ token: me.token });
+  if (me.account) setSession({ email: me.account.email, plan: me.account.plan, proUntil: me.account.proUntil });
+  else if (getSession().email) setSession({ email: null, plan: 'free', proUntil: null, token: null });
+  return me;
+}
+
 export const CODE_TTL_MS = 10 * 60 * 1000;
 export const MAX_TRIES = 5;
 
@@ -39,68 +83,79 @@ export function validEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
 }
 
-export async function requestCode(email: string): Promise<{ previewCode?: string }> {
+export async function requestCode(email: string): Promise<{ ok: boolean }> {
   const e = email.trim().toLowerCase();
   if (!validEmail(e)) throw new ApiError('bad_email', 'That email doesn’t look right.');
-  if (!PREVIEW) return call('/auth/code', { email: e });
-  await wait(600);
-  const code = String(Math.floor(100000 + Math.random() * 900000));
-  pending.set(e, { code, expires: Date.now() + CODE_TTL_MS, tries: 0 });
-  return { previewCode: code };
+  return call('/auth/code', { email: e });
 }
 
 export async function verifyCode(email: string, code: string): Promise<{ email: string }> {
-  const e = email.trim().toLowerCase();
-  if (!PREVIEW) return call('/auth/verify', { email: e, code });
-  await wait(500);
-  const p = pending.get(e);
-  if (!p) throw new ApiError('no_code', 'Ask for a new code first.');
-  if (Date.now() > p.expires) {
-    pending.delete(e);
-    throw new ApiError('expired', 'That code expired. We can send a new one.');
-  }
-  p.tries++;
-  if (p.tries > MAX_TRIES) {
-    pending.delete(e);
-    throw new ApiError('too_many', 'Too many tries. Ask for a new code.');
-  }
-  if (p.code !== code) throw new ApiError('wrong_code', `That code isn’t right. ${MAX_TRIES - p.tries} ${MAX_TRIES - p.tries === 1 ? 'try' : 'tries'} left.`);
-  pending.delete(e);
-  return { email: e };
+  const r = await call<{ token: string; account: NonNullable<Me['account']> }>('/auth/verify', { email: email.trim().toLowerCase(), code });
+  setSession({ token: r.token, email: r.account.email, plan: r.account.plan, proUntil: r.account.proUntil });
+  return { email: r.account.email };
 }
 
-// ------------------------------------------------------------------ Meta
-export interface AdAccountChoice {
+export async function signOut() {
+  await call('/auth/signout', {}).catch(() => {});
+  clearSession({ reportName: getSession().reportName });
+}
+
+export async function deleteAccount() {
+  if (getSession().token) await call('/account/delete', {});
+  clearSession();
+}
+
+export async function checkout(): Promise<{ url: string }> {
+  return call('/billing/checkout', {});
+}
+
+export async function joinWaitlist(email: string) {
+  return call('/waitlist', { email });
+}
+
+// ------------------------------------------------------------------ page checks
+export interface Finding {
   id: string;
-  name: string;
-  currency: string;
-  spend30d: number;
-  status: 'active' | 'disabled';
-  role: 'admin' | 'advertiser' | 'analyst';
+  tone: 'leak' | 'warn' | 'saved' | 'idle';
+  title: string;
+  detail: string;
+}
+export interface CheckResult {
+  probe: Probe;
+  findings: Finding[];
+  screenshot: string | null;
+  checksLeft: number;
 }
 
-/** In server mode this returns Meta's OAuth URL; preview mode lists the sample account. */
-export async function startMetaConnect(): Promise<{ redirect?: string }> {
-  if (!PREVIEW) return call('/meta/oauth/start', {});
-  await wait(700);
-  return {};
+export async function checkPage(url: string, opts: { pixelId?: string; source?: 'manual' | 'report' } = {}): Promise<CheckResult> {
+  return call('/check', { url, pixelId: opts.pixelId || undefined, source: opts.source ?? 'manual' }, { timeoutMs: 75_000 });
 }
 
-export async function listAdAccounts(sampleSpend: number): Promise<AdAccountChoice[]> {
-  if (!PREVIEW) return call('/accounts');
-  await wait(500);
-  return [
-    { id: 'act_demo_kora', name: 'Kora Candles', currency: 'INR', spend30d: sampleSpend, status: 'active', role: 'admin' },
-    { id: 'act_demo_old', name: 'Kora Candles (old, 2024)', currency: 'INR', spend30d: 0, status: 'disabled', role: 'admin' },
-    { id: 'act_demo_client', name: 'Client account · read only', currency: 'INR', spend30d: 0, status: 'active', role: 'analyst' },
-  ];
+export interface Watch {
+  url: string;
+  pixelId: string | null;
+  lastState: string | null;
+  lastChecked: string | null;
+}
+export const listWatches = () => call<{ watches: Watch[] }>('/watch');
+export const addWatch = (url: string, pixelId?: string, state?: string) => call('/watch', { url, pixelId, state });
+export const removeWatch = (url: string) => call('/watch/remove', { url });
+
+// ------------------------------------------------------------------ explanations
+const explained = new Map<string, Promise<string | null>>();
+/** Plain explanation for a leak (null → show the rules sentence). Cached per leak and numbers. */
+export function explainLeak(leak: Leak): Promise<string | null> {
+  const key = `${leak.id}|${leak.perDay}|${leak.summary}`;
+  if (!explained.has(key)) {
+    const p = call<{ text: string | null }>('/explain', {
+      leak: { title: leak.title, summary: leak.summary, since: leak.since, facts: leak.evidence.facts, fixSteps: leak.fixSteps },
+    }, { timeoutMs: 30_000 }).then((r) => r.text).catch(() => null);
+    explained.set(key, p);
+  }
+  return explained.get(key)!;
 }
 
-export async function checkout(): Promise<{ url?: string }> {
-  if (!PREVIEW) return call('/billing/checkout', {});
-  await wait(600);
-  return {};
+// ------------------------------------------------------------------ events (Pulse)
+export function track(name: string, props: Record<string, string | number | boolean> = {}) {
+  call('/events', { name, props }).catch(() => {});
 }
-
-/** The Claude connector endpoint (MCP over HTTP) served by the edge worker. */
-export const MCP_URL = BASE ? `${BASE}/mcp` : 'https://leakwatch-edge.workers.dev/mcp';

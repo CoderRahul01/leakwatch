@@ -8,24 +8,22 @@ export type Plan = 'free' | 'pro';
 
 export interface Session {
   email: string | null;
+  /** Long-lived session token from the API (sent as a Bearer token). */
+  token: string | null;
   plan: Plan;
-  accountName: string | null;
-  connectedAt: string | null;
-  tokenExpired: boolean;
-  morningEmail: boolean;
-  claudeConnected: boolean;
+  proUntil: string | null;
+  /** Name of the imported ad account (the report itself lives in report-store). */
+  reportName: string | null;
   bannerDismissed: boolean;
 }
 
-const KEY = 'leakwatch.session.v1';
+const KEY = 'leakwatch.session.v2';
 const blank: Session = {
   email: null,
+  token: null,
   plan: 'free',
-  accountName: null,
-  connectedAt: null,
-  tokenExpired: false,
-  morningEmail: true,
-  claudeConnected: false,
+  proUntil: null,
+  reportName: null,
   bannerDismissed: false,
 };
 

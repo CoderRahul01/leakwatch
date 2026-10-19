@@ -1,0 +1,19 @@
+{
+  "name": "leakwatch-edge",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "migrate": "node scripts/migrate.mjs",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "@cloudflare/puppeteer": "1.4.0",
+    "@neondatabase/serverless": "1.2.0"
+  },
+  "devDependencies": {
+    "pg": "^8.23.1",
+    "wrangler": "4.151.2"
+  }
+}

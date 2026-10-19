@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "leakwatch-edge",
+  "main": "src/index.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "keep_vars": true,
+  "ai": { "binding": "AI" },
+  // a real Chrome for the phone page check
+  "browser": { "binding": "BROWSER" },
+  // sign-in codes and alerts go out through almanac-edge's Mailer (same verified Resend domain);
+  // switch on with MAILER_ON = "1" once almanac-edge with the Mailer entrypoint is deployed
+  "services": [{ "binding": "MAILER", "service": "almanac-edge", "entrypoint": "Mailer" }],
+  "vars": {
+    "PUBLIC_URL": "https://leakwatch.vercel.app",
+    "EXTRA_ORIGINS": "https://leakwatch.tech,https://www.leakwatch.tech",
+    "MAILER_ON": "0",
+    // Browser Rendering seconds per day across everyone (Workers Free includes 10 minutes a day)
+    "BROWSER_DAILY_SECONDS": "540"
+  },
+  // secrets (wrangler secret put): DATABASE_URL DODO_PRODUCT_ID DODO_WEBHOOK_SECRET CRON_SECRET OPENROUTER_API_KEY
+  //   optional: RESEND_API_KEY + EMAIL_FROM (instead of the Mailer binding)
+  // hourly: re-open watched pages that are due (each page once a day) and email changes
+  "triggers": { "crons": ["17 * * * *"] },
+  "observability": { "enabled": true }
+}

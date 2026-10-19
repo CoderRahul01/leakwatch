@@ -244,8 +244,9 @@ export function detectLeaks(ds: Dataset, opts: DetectOptions = {}): Leak[] {
       setIds.forEach((id) => explained.add(id));
     }
 
-    const promoted = new Set(setIds.map((id) => byId.get(id)!.pixelId));
-    if (probe.pixelIds.length > 0 && !probe.pixelIds.some((p) => promoted.has(p))) {
+    // Imported accounts may not know which pixel an ad set uses (empty id): then we can't compare.
+    const promoted = new Set(setIds.map((id) => byId.get(id)!.pixelId).filter(Boolean));
+    if (promoted.size > 0 && probe.pixelIds.length > 0 && !probe.pixelIds.some((p) => promoted.has(p))) {
       leaks.push({
         ...base,
         id: leakId('T2', setIds),
@@ -266,9 +267,7 @@ export function detectLeaks(ds: Dataset, opts: DetectOptions = {}): Leak[] {
       setIds.forEach((id) => explained.add(id));
     }
 
-    const seen = new Map<string, number>();
-    for (const e of probe.events) if (!e.eventId) seen.set(e.name, (seen.get(e.name) ?? 0) + 1);
-    const dupes = [...seen.keys()];
+    const dupes = duplicateEvents(probe.events);
     if (dupes.length > 0) {
       const before = total(mergeDays(setIds.map((id) => daily.get(id)!)), Math.max(0, sinceIdx - 10), sinceIdx - 1);
       const after = total(mergeDays(setIds.map((id) => daily.get(id)!)), sinceIdx, last);
@@ -599,6 +598,24 @@ export function detectLeaks(ds: Dataset, opts: DetectOptions = {}): Leak[] {
 function mergeDays(arrays: Agg[][]): Agg[] {
   if (arrays.length === 0) return [];
   return arrays[0].map((_, i) => arrays.reduce((acc, arr) => add(acc, arr[i]), empty()));
+}
+
+/**
+ * Event names one pixel sent more than once that Meta can't merge: a second copy without the same
+ * event ID. One PageView with no event ID is normal; two of them is a double count.
+ */
+export function duplicateEvents(events: Probe['events']): string[] {
+  const groups = new Map<string, Set<string>>();
+  const counts = new Map<string, number>();
+  events.forEach((e, i) => {
+    const k = `${e.pixelId}|${e.name}`;
+    counts.set(k, (counts.get(k) ?? 0) + 1);
+    if (!groups.has(k)) groups.set(k, new Set());
+    groups.get(k)!.add(e.eventId ?? `none${i}`);
+  });
+  const names = new Set<string>();
+  for (const [k, ids] of groups) if ((counts.get(k) ?? 0) >= 2 && ids.size >= 2) names.add(k.split('|')[1]);
+  return [...names];
 }
 
 export function shortPath(url: string): string {

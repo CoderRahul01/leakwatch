@@ -1,7 +1,7 @@
 # Leakwatch: build handoff
 
 **Start with `docs/STATUS.md`** (what's built, what's next, how to run). Then: `docs/PRODUCT.md` (what), `docs/DESIGN_BRIEF.md` (how it looks), `docs/STACK.md` (how
-it's built), `docs/TEARDOWN.md` (why). Deadline: **Mon Oct 19, 12:29 PM IST** (Oct 18 11:59 PM PDT).
+it's built), `docs/TEARDOWN.md` (why). Contest deadline passed (Oct 19, 12:29 PM IST); now launching as a paid product — see `docs/STATUS.md` "Next".
 
 ## Rules
 - Plain language in the UI; no model names. Partners credited in the footer.
@@ -11,7 +11,7 @@ it's built), `docs/TEARDOWN.md` (why). Deadline: **Mon Oct 19, 12:29 PM IST** (O
   always store the previous state so Undo works.
 - Secrets never in git (`.env`, `.dev.vars` are ignored). Use `wrangler secret` and Render env.
 
-## Layout (`shared/` and `web/` exist; the rest is to create)
+## Layout (`shared/`, `web/`, `edge/` exist; `jobs/` and `e2e/` are to create)
 ```
 web/      Vite + React + TS, Vercel project `leakwatch` (Root: web, output dist)
 edge/     Cloudflare Worker `leakwatch-edge` (API, cron, Gemma via Workers AI), sql/ migrations
